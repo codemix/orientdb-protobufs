@@ -17,6 +17,23 @@ enum DatabaseType {
   GRAPH = 1;
 }
 
+/**
+ * # Record Types
+ */
+enum RecordType {
+  RECORD_BYTES = 0;
+  RECORD_FLAT_DATA = 1;
+  RECORD_DOCUMENT = 2;
+}
+
+/**
+ * # Cluster Types
+ */
+enum ClusterType {
+  CLUSTER_LOCAL = 0;
+  CLUSTER_MEMORY = 1;
+  CLUSTER_PHYSICAL = 2;
+}
 
 /**
  * # Command Modes
@@ -32,15 +49,6 @@ enum CommandMode {
  * # Record
  */
 message Record {
-  /**
-   * # Record Types
-   */
-  enum RecordType {
-    BYTES = 0;
-    FLAT_DATA = 1;
-    DOCUMENT = 2;
-  }
-
   optional int32 cluster = 1;
   optional int64 position = 2;
   required RecordType type = 3;
@@ -52,14 +60,6 @@ message Record {
  * # Cluster
  */
 message Cluster {
-  /**
-   * # Cluster Types
-   */
-  enum ClusterType {
-    LOCAL = 0;
-    MEMORY = 1;
-    PHYSICAL = 2;
-  }
   required int32 id = 1;
   required ClusterType type = 2;
   required int32 dataSegment = 3;
@@ -105,6 +105,7 @@ message HashMapItem {
 /**
  * # Connect
  * Connect to the server.
+ * @see OkResponse
  */
 message ConnectOp {
   optional int32 sessionId = 1;
@@ -131,6 +132,202 @@ message DbOpenOp {
   required string password = 9;
 }
 
+message DbOpenResponse {
+  required int32 sessionId = 1;
+  repeated Cluster clusters = 2;
+  optional bytes servers = 3; // serialized servers list
+  optional string release = 4;
+}
+
+/**
+ * # List Databases
+ */
+message DbListOp {
+  optional int32 sessionId = 1;
+}
+
+message DbListResponse {
+  optional bytes databases = 1; // serialized database list
+}
+
+/**
+ * # Reload Database
+ */
+message DbReloadOp {
+  required int32 sessionId = 1;
+}
+
+message DbReloadResponse {
+  required int32 sessionId = 1;
+  repeated Cluster clusters = 2;
+}
+
+/**
+ * # Database Exists?
+ */
+message DbExistsOp {
+  required int32 sessionId = 1;
+  required string name = 2;
+  required DatabaseStorageType storage = 3;
+}
+
+message DbExistsResponse {
+  required int32 sessionId = 1;
+  required bool exists = 2;
+}
+
+/**
+ * # Create Database
+ * @see OkResponse
+ */
+message DbCreateOp {
+  required int32 sessionId = 1;
+  required string name = 2;
+  required DatabaseType type = 3;
+  required DatabaseStorageType storage = 4;
+}
+
+/**
+ * # Count Database Records
+ */
+message DbCountRecordsOp {
+  required int32 sessionId = 1;
+}
+
+message DbCountRecordsResponse {
+  required int32 sessionId = 1;
+  required int64 count = 2;
+}
+
+/**
+ * # Delete Database
+ * @see OkResponse
+ */
+message DbDeleteOp {
+  required int32 sessionId = 1;
+  required string name = 2;
+  required DatabaseStorageType storage = 3;
+}
+
+/**
+ * # Close Database
+ * @see OkResponse
+ */
+message DbCloseOp {
+  required int32 sessionId = 1;
+}
+
+/**
+ * # Get Config
+ */
+message ConfigGetOp {
+  optional int32 sessionId = 1;
+  required string key = 2;
+}
+
+message ConfigGetResponse {
+  optional int32 sessionId = 1;
+  required string value = 2;
+}
+
+/**
+ * # Set Config
+ * @see OkResponse
+ */
+message ConfigSetOp {
+  optional int32 sessionId = 1;
+  required string key = 2;
+  required string value = 3;
+}
+
+/**
+ * # List Config
+ */
+message ConfigListOp {
+  optional int32 sessionId = 1;
+}
+
+message ConfigListResponse {
+  optional int32 sessionId = 1;
+  repeated HashMapItem items = 2;
+}
+
+
+/**
+ * # Add Data Segment
+ */
+message DataSegmentAddOp {
+  required int32 sessionId = 1;
+  required string name = 3;
+  optional string location = 4;
+}
+
+message DataSegmentAddResponse {
+  required int32 sessionId = 1;
+  required int32 id = 2;
+}
+
+/**
+ * # Drop Data Segment
+ * @see OperationResponse
+ */
+message DataSegmentDropOp {
+  required int32 sessionId = 1;
+  required string name = 2;
+}
+
+/**
+ * # Add Data Cluster
+ */
+message ClusterAddOp {
+  required int32 sessionId = 1;
+  required ClusterType type = 2;
+  required string name = 3;
+  optional string location = 4;
+  optional string segment = 5;
+  optional int32 id = 6;
+}
+
+message ClusterAddResponse {
+  required int32 sessionId = 1;
+  required int32 id = 2;
+}
+
+/**
+ * # Drop Data Cluster
+ * @see OperationResponse
+ */
+message ClusterDropOp {
+  required int32 sessionId = 1;
+  required string name = 2;
+}
+
+/**
+ * # Cluster Record Count
+ */
+message ClusterCountOp {
+  required int32 sessionId = 1;
+  repeated int32 ids = 2;
+}
+
+message ClusterCountResponse {
+  required int32 sessionId = 1;
+  required int64 count = 2;
+}
+
+/**
+ * # Cluster Data Range
+ */
+message ClusterDataRangeOp {
+  required int32 sessionId = 1;
+  required int32 id = 2;
+}
+
+message ClusterDataRangeResponse {
+  required int32 sessionId = 1;
+  required int64 begin = 2;
+  required int64 end = 3;
+}
 /**
  * # Record Load
  */
@@ -143,14 +340,104 @@ message RecordLoadOp {
   optional bool tombstones = 6;
 }
 
+message RecordLoadResponse {
+  required int32 sessionId = 1;
+  repeated Record records = 2;
+}
+
+
+/**
+ * # Record Create
+ */
+message RecordCreateOp {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  optional int32 dataSegment = 3;
+  required bytes content = 4;
+  required RecordType type = 5;
+  required CommandMode mode = 6;
+}
+
+message RecordCreateResponse {
+  required int32 sessionId = 1;
+  required int64 position = 2;
+  required int32 version = 3;
+}
+
+/**
+ * # Record Update
+ */
+message RecordUpdateOp {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  required int64 position = 3;
+  required bytes content = 4;
+  optional int32 version = 5;
+  required RecordType type = 6;
+  required CommandMode mode = 7;
+}
+
+message RecordUpdateResponse {
+  required int32 sessionId = 1;
+  required int32 version = 2;
+}
+
+/**
+ * # Record Delete
+ * @see OperationResponse
+ */
+message RecordDeleteOp {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  required int64 position = 3;
+  optional int32 version = 4;
+  required CommandMode mode = 5;
+}
+
+/**
+ * # Record Metadata
+ */
+message RecordMetadataOp {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  required int64 position = 3;
+}
+
+message RecordMetadataResponse {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  required int64 position = 3;
+  required int32 version = 4;
+}
+
+
+/**
+ * # Record Clean Out
+ * @see OperationResponse
+ */
+message RecordCleanoutOp {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  required int64 position = 3;
+  optional int32 version = 4;
+  required CommandMode mode = 5;
+}
+
 /**
  * # Command
+ * @see CommandResponse
  */
 message CommandOp {
   required int32 sessionId = 1;
   required CommandMode mode = 2;
   required Query query = 3;
 }
+
+message CommandResponse {
+  required int32 sessionId = 1;
+  repeated Record records = 2;
+}
+
 
 // # Responses
 
@@ -174,29 +461,24 @@ message ErrorResponse {
 
 
 /**
- * # Open Database Response
+ * # Operation Response
+ * A response indicating whether an operation was successful.
  */
-message DbOpenResponse {
+message OperationResponse {
   required int32 sessionId = 1;
-  repeated Cluster clusters = 2;
-  optional bytes servers = 3; // serialized servers list
-  optional string release = 4;
+  optional int32 version = 2;
+  required bool success = 3;
 }
 
 
-/**
- * # Record Load Response
- */
-message RecordLoadResponse {
-  required int32 sessionId = 1;
-  repeated Record records = 2;
-}
 
 
-/**
- * # Command Response
- */
-message CommandResponse {
-  required int32 sessionId = 1;
-  repeated Record records = 2;
-}
+
+
+
+
+
+
+
+
+
