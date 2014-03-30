@@ -328,6 +328,7 @@ message ClusterDataRangeResponse {
   required int64 begin = 2;
   required int64 end = 3;
 }
+
 /**
  * # Record Load
  */
@@ -344,7 +345,6 @@ message RecordLoadResponse {
   required int32 sessionId = 1;
   repeated Record records = 2;
 }
-
 
 /**
  * # Record Create
@@ -410,7 +410,6 @@ message RecordMetadataResponse {
   required int32 version = 4;
 }
 
-
 /**
  * # Record Clean Out
  * @see OperationResponse
@@ -469,16 +468,3 @@ message OperationResponse {
   optional int32 version = 2;
   required bool success = 3;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
