@@ -83,7 +83,7 @@ message Query {
  */
 message Error {
   optional string type = 1;
-  optional string message = 2;
+  optional string text = 2;
   optional bytes stackTrace = 3;
   optional Error prev = 4;
 }
