@@ -1,0 +1,202 @@
+// # Enums
+
+
+/**
+ * # Database Storage Types
+ */
+enum DatabaseStorageType {
+  LOCAL = 0;
+  MEMORY = 1;
+  PLOCAL = 2;
+}
+/**
+ * # Database Types
+ */
+enum DatabaseType {
+  DOCUMENT = 0;
+  GRAPH = 1;
+}
+
+
+/**
+ * # Command Modes
+ */
+enum CommandMode {
+  SYNC = 0;
+  ASYNC = 1;
+}
+
+// # Primitives
+
+/**
+ * # Record
+ */
+message Record {
+  /**
+   * # Record Types
+   */
+  enum RecordType {
+    BYTES = 0;
+    FLAT_DATA = 1;
+    DOCUMENT = 2;
+  }
+
+  optional int32 cluster = 1;
+  optional int64 position = 2;
+  required RecordType type = 3;
+  optional bool prefetched = 4;
+  optional bytes content = 5; // serialized record content.
+}
+
+/**
+ * # Cluster
+ */
+message Cluster {
+  /**
+   * # Cluster Types
+   */
+  enum ClusterType {
+    LOCAL = 0;
+    MEMORY = 1;
+    PHYSICAL = 2;
+  }
+  required int32 id = 1;
+  required ClusterType type = 2;
+  required int32 dataSegment = 3;
+}
+
+/**
+ * # Query
+ */
+message Query {
+  optional string class = 1;
+  required string text = 2;
+  optional string fetchPlan = 3;
+  optional int32 limit = 4;
+  optional bytes params = 5; // serialized query parameters
+}
+
+/**
+ * # Error
+ * Represents an error, which can optionally have a reference
+ * to a previous error.
+ */
+message Error {
+  optional string type = 1;
+  optional string message = 2;
+  optional bytes stackTrace = 3;
+  optional Error prev = 4;
+}
+
+/**
+ * # Hash Map Item
+ * Represents an item in a hash map.
+ * Since protobufs cannot express a map directly, this is a
+ * simple key / value pair.
+ */
+message HashMapItem {
+  required string key = 1;
+  required string value = 2;
+}
+
+
+// # Operations
+
+/**
+ * # Connect
+ * Connect to the server.
+ */
+message ConnectOp {
+  optional int32 sessionId = 1;
+  optional string driverName = 2;
+  optional string driverVersion = 3;
+  required int32 protocolVersion = 4;
+  optional string clientId = 5;
+  required string username = 6;
+  required string password = 7;
+}
+
+/**
+ * # Open Database
+ */
+message DbOpenOp {
+  optional int32 sessionId = 1;
+  optional string driverName = 2;
+  optional string driverVersion = 3;
+  required int32 protocolVersion = 4;
+  optional string clientId = 5;
+  required string name = 6;
+  required DatabaseType type = 7;
+  required string username = 8;
+  required string password = 9;
+}
+
+/**
+ * # Record Load
+ */
+message RecordLoadOp {
+  required int32 sessionId = 1;
+  required int32 cluster = 2;
+  required int64 position = 3;
+  optional string fetchPlan = 4;
+  optional bool ignoreCache = 5;
+  optional bool tombstones = 6;
+}
+
+/**
+ * # Command
+ */
+message CommandOp {
+  required int32 sessionId = 1;
+  required CommandMode mode = 2;
+  required Query query = 3;
+}
+
+// # Responses
+
+
+/**
+ * # OK Response
+ * A generic response meaning that the request was successful.
+ */
+message OkResponse {
+  optional int32 sessionId = 1;
+}
+
+/**
+ * # Error Response
+ * A response indicating an error.
+ */
+message ErrorResponse {
+  optional int32 sessionId = 1;
+  required Error error = 2;
+}
+
+
+/**
+ * # Open Database Response
+ */
+message DbOpenResponse {
+  required int32 sessionId = 1;
+  repeated Cluster clusters = 2;
+  optional bytes servers = 3; // serialized servers list
+  optional string release = 4;
+}
+
+
+/**
+ * # Record Load Response
+ */
+message RecordLoadResponse {
+  required int32 sessionId = 1;
+  repeated Record records = 2;
+}
+
+
+/**
+ * # Command Response
+ */
+message CommandResponse {
+  required int32 sessionId = 1;
+  repeated Record records = 2;
+}
