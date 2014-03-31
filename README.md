@@ -4,7 +4,7 @@ This is an experiment to see how the orientdb binary protocol could look if it u
 
 Check out [definitions.proto](./definitions.proto) for the data structures.
 
-> Note: only a tiny subset of the orientdb commands are currently implemented.
+> Note: most but not all of the orientdb commands are currently implemented.
 
 
 ## Generating the definitions.
@@ -13,8 +13,7 @@ First, install protoc after downloading it from [the repo](https://code.google.c
 
 Then run `make all` and have a look at the `out` directory.
 
-----------------------------------------------
-
+----------------------------------------------------------
 
 # Why Protobufs
 
