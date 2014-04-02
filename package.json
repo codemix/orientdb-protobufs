@@ -1,0 +1,21 @@
+{
+  "name": "orientdb-protobufs",
+  "version": "0.0.0",
+  "description": "This is an experiment to see how the orientdb binary protocol could look if it used [protocol buffers](https://developers.google.com/protocol-buffers).",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/codemix/orientdb-protobufs.git"
+  },
+  "dependencies": {
+    "docco": "*"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/codemix/orientdb-protobufs/issues"
+  },
+  "homepage": "https://github.com/codemix/orientdb-protobufs"
+}
