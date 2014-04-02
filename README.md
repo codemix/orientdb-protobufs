@@ -2,7 +2,7 @@
 
 This is an experiment to see how the orientdb binary protocol could look if it used [protocol buffers](https://developers.google.com/protocol-buffers).
 
-Check out [definitions.proto](./definitions.proto) for the data structures.
+Check out [orientdb.proto](./orientdb.proto) for the data structures.
 
 > Note: most but not all of the orientdb commands are currently implemented.
 
