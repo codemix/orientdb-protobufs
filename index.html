@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Protocol Buffers for OrientDB</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="public/stylesheets/normalize.css" />
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="page">
+
+      <div class="header">
+        
+          
+          <h1 id="protocol-buffers-for-orientdb">Protocol Buffers for OrientDB</h1>
+<p>The protobuf based communication protocol is relatively simple, the client sends a request to the server and the server sends a
+response, in FIFO order. There are two different types of request a client can send:</p>
+<p> 1 <strong>Signals</strong> - individual messages that have no content other than an optional session id and their <a href="#request-types">RequestType</a>.
+   Signals are expressed entirely within a <a href="#request-header">RequestHeader</a>, they have no further content. An example of a signal would be the db reload command,
+   which operates solely on the currently selected database and accepts no parameters.</p>
+<p> 2 <strong>Operations</strong> - Operations are requests that require some kind of parameters, such as a database name and credentials for <a href="#open-database">db open</a>.
+   Operations are expressed as a <a href="#request-header">RequestHeader</a> immediately followed by the <a href="#operations">operation message</a>.</p>
+<p>In response, the server sends a <a href="#response-header">ResponseHeader</a>. This response header contains the session id where appropriate, and optionally, the <a href="#response-type">response type</a>.
+The response type indicates the type of the next message so that the client knows how to decode it. If a response type is omitted, the response is treated as an ‘ack’, and no response body will be sent.</p>
+<p>The request / response algorithm looks like this:</p>
+<ol>
+<li>Client sends a <a href="#request-header">RequestHeader</a> message containing the request type, and optionally, a session id.</li>
+<li>If the request is an operation and not a signal, immediately send the operation message of the applicable type.</li>
+<li>Server responds with a <a href="#response-header">ResponseHeader</a>. If the response header omits a response type, the response is
+treated as an ‘ack’ and is considered complete.</li>
+<li>If a response type <em>is</em> specified, the server will immediately send a response message of the type indicated in the header.
+If the client does not know how to handle the received message type, it can skip it.</li>
+</ol>
+<p>The definitions are split into 5 logical groups:</p>
+<ol>
+<li><a href="#headers">Headers</a> - The request / response headers.</li>
+<li><a href="#enums">Enums</a> - Constant values reused by the rest of the protocol.</li>
+<li><a href="#primitives">Primitives</a> - The primitive data structures that make up the protocol.</li>
+<li><a href="#operations">Operations</a> - The operations can be sent to the server.</li>
+<li><a href="#responses">Responses</a> - The responses that can be received by the client.</li>
+</ol>
+
+          
+        
+
+        
+      </div>
+
+      
+        
+        <h1 id="headers">Headers</h1>
+<p>Headers are sent by both client and server, they contain information about the request / response type and indicate
+what kind of message, if any, the other side should expect to recieve next.</p>
+
+        
+      
+        
+        <h2 id="request-header">Request Header</h2>
+<p>This is the header that precedes a request.
+It is used to indicate the <a href="#request-types">type</a> of the following request message if any.</p>
+
+        
+          <div class='highlight'><pre>message RequestHeader {
+  optional int32 sessionId = <span class="hljs-number">1</span>;
+  required RequestType type = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="response-header">Response Header</h2>
+<p>This is the header that precedes a response, it indicates whether or not the
+client should expect a response body and if so, what <a href="#response-types">type</a> that response will be.
+If the response type is omited, the response is treated as an ‘ack’ and no response body will be expected.</p>
+
+        
+          <div class='highlight'><pre>message ResponseHeader {
+  optional int32 sessionId = <span class="hljs-number">1</span>;
+  optional ResponseType type = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h1 id="enums">Enums</h1>
+<p>These constant values are used by other data structures in the protocol.</p>
+
+        
+      
+        
+        <h2 id="database-storage-types">Database Storage Types</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> DatabaseStorageType {
+  LOCAL = <span class="hljs-number">0</span>;
+  MEMORY = <span class="hljs-number">1</span>;
+  PLOCAL = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="database-types">Database Types</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> DatabaseType {
+  DOCUMENT = <span class="hljs-number">0</span>;
+  GRAPH = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-types">Record Types</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> RecordType {
+  RECORD_BYTES = <span class="hljs-number">0</span>;
+  RECORD_FLAT_DATA = <span class="hljs-number">1</span>;
+  RECORD_DOCUMENT = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="cluster-types">Cluster Types</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> ClusterType {
+  CLUSTER_LOCAL = <span class="hljs-number">0</span>;
+  CLUSTER_MEMORY = <span class="hljs-number">1</span>;
+  CLUSTER_PHYSICAL = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="command-modes">Command Modes</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> CommandMode {
+  SYNC = <span class="hljs-number">0</span>;
+  ASYNC = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="request-types">Request Types</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> RequestType {
+  REQUEST_SHUTDOWN = <span class="hljs-number">1</span>; <span class="hljs-comment">// Shut down server.</span>
+  REQUEST_CONNECT = <span class="hljs-number">2</span>; <span class="hljs-comment">// Required initial operation to access to server commands.</span>
+  REQUEST_DB_OPEN = <span class="hljs-number">3</span>; <span class="hljs-comment">// Required initial operation to access to the database.</span>
+  REQUEST_DB_CREATE = <span class="hljs-number">4</span>; <span class="hljs-comment">// Add a new database.</span>
+  REQUEST_DB_EXIST = <span class="hljs-number">6</span>; <span class="hljs-comment">// Check if database exists.</span>
+  REQUEST_DB_DROP = <span class="hljs-number">7</span>; <span class="hljs-comment">// Delete database.</span>
+  REQUEST_CONFIG_GET = <span class="hljs-number">70</span>; <span class="hljs-comment">//  Get a configuration property.</span>
+  REQUEST_CONFIG_SET = <span class="hljs-number">71</span>; <span class="hljs-comment">//  Set a configuration property.</span>
+  REQUEST_CONFIG_LIST = <span class="hljs-number">72</span>; <span class="hljs-comment">//  Get a list of configuration properties.</span>
+  REQUEST_DB_LIST = <span class="hljs-number">74</span>; <span class="hljs-comment">// Get a list of databases.</span>
+  REQUEST_DB_CLOSE = <span class="hljs-number">5</span>; <span class="hljs-comment">// Close a database.</span>
+  REQUEST_DB_SIZE = <span class="hljs-number">8</span>; <span class="hljs-comment">// Get the size of a database (in bytes).</span>
+  REQUEST_DB_COUNTRECORDS = <span class="hljs-number">9</span>; <span class="hljs-comment">// Get total number of records in a database.</span>
+  REQUEST_DATACLUSTER_ADD = <span class="hljs-number">10</span>; <span class="hljs-comment">//  Add a data cluster.</span>
+  REQUEST_DATACLUSTER_DROP = <span class="hljs-number">11</span>; <span class="hljs-comment">//  Delete a data cluster.</span>
+  REQUEST_DATACLUSTER_COUNT = <span class="hljs-number">12</span>; <span class="hljs-comment">//  Get the total number of data clusters.</span>
+  REQUEST_DATACLUSTER_DATARANGE = <span class="hljs-number">13</span>; <span class="hljs-comment">//  Get the data range of data clusters.</span>
+  REQUEST_DATACLUSTER_COPY = <span class="hljs-number">14</span>; <span class="hljs-comment">//  Copy a data cluster.</span>
+  REQUEST_DATACLUSTER_LH_CLUSTER_IS_USED = <span class="hljs-number">16</span>; <span class="hljs-comment">// ?</span>
+  REQUEST_DATASEGMENT_ADD = <span class="hljs-number">20</span>; <span class="hljs-comment">//  Add a data segment.</span>
+  REQUEST_DATASEGMENT_DROP = <span class="hljs-number">21</span>; <span class="hljs-comment">//  Delete a data segment.</span>
+  REQUEST_RECORD_METADATA = <span class="hljs-number">29</span>; <span class="hljs-comment">//  Get metadata from a record.</span>
+  REQUEST_RECORD_LOAD = <span class="hljs-number">30</span>; <span class="hljs-comment">//  Load a record.</span>
+  REQUEST_RECORD_CREATE = <span class="hljs-number">31</span>; <span class="hljs-comment">//  Add a record.</span>
+  REQUEST_RECORD_UPDATE = <span class="hljs-number">32</span>;
+  REQUEST_RECORD_DELETE = <span class="hljs-number">33</span>; <span class="hljs-comment">//  Delete a record.</span>
+  REQUEST_RECORD_COPY = <span class="hljs-number">34</span>; <span class="hljs-comment">//  Copy a record.</span>
+  REQUEST_POSITIONS_HIGHER = <span class="hljs-number">36</span>; <span class="hljs-comment">//  Get a record above the current record.</span>
+  REQUEST_POSITIONS_LOWER = <span class="hljs-number">37</span>; <span class="hljs-comment">//  Get the record below the current record.</span>
+  REQUEST_RECORD_CLEAN_OUT = <span class="hljs-number">38</span>; <span class="hljs-comment">//  Clean out record.</span>
+  REQUEST_POSITIONS_FLOOR = <span class="hljs-number">39</span>; <span class="hljs-comment">//  Get the last record.</span>
+  REQUEST_COUNT = <span class="hljs-number">40</span>; <span class="hljs-comment">// (DEPRECATED)  See REQUEST_DATACLUSTER_COUNT</span>
+  REQUEST_COMMAND = <span class="hljs-number">41</span>; <span class="hljs-comment">//  Execute a command.</span>
+  REQUEST_POSITIONS_CEILING = <span class="hljs-number">42</span>; <span class="hljs-comment">//  Get the first record.</span>
+  REQUEST_TX_COMMIT = <span class="hljs-number">60</span>; <span class="hljs-comment">//  Commit transaction.</span>
+  REQUEST_DB_RELOAD = <span class="hljs-number">73</span>; <span class="hljs-comment">//  Reload database.</span>
+  REQUEST_PUSH_RECORD = <span class="hljs-number">79</span>;
+  REQUEST_PUSH_DISTRIB_CONFIG = <span class="hljs-number">80</span>;
+  REQUEST_DB_COPY = <span class="hljs-number">90</span>;
+  REQUEST_REPLICATION = <span class="hljs-number">91</span>;
+  REQUEST_CLUSTER = <span class="hljs-number">92</span>;
+  REQUEST_DB_TRANSFER = <span class="hljs-number">93</span>;
+  REQUEST_DB_FREEZE = <span class="hljs-number">94</span>;
+  REQUEST_DB_RELEASE = <span class="hljs-number">95</span>;
+  REQUEST_DATACLUSTER_FREEZE = <span class="hljs-number">96</span>;
+  REQUEST_DATACLUSTER_RELEASE = <span class="hljs-number">97</span>;
+  REQUEST_CREATE_SBTREE_BONSAI = <span class="hljs-number">110</span>; <span class="hljs-comment">// Creates an sb-tree bonsai on the remote server</span>
+  REQUEST_SBTREE_BONSAI_GET = <span class="hljs-number">111</span>; <span class="hljs-comment">// Get value by key from sb-tree bonsai</span>
+  REQUEST_SBTREE_BONSAI_FIRST_KEY = <span class="hljs-number">112</span>; <span class="hljs-comment">// Get first key from sb-tree bonsai</span>
+  REQUEST_SBTREE_BONSAI_GET_ENTRIES_MAJOR = <span class="hljs-number">113</span>; <span class="hljs-comment">// Gets the portion of entries major than specified one. If returns 0 entries than the specified entrie is the largest</span>
+  REQUEST_RIDBAG_GET_SIZE = <span class="hljs-number">114</span>; <span class="hljs-comment">// Rid-bag specific operation. Send but doesRetrieves computed size of rid bag.</span>
+}</pre></div>
+        
+      
+        
+        <h2 id="response-types">Response Types</h2>
+
+        
+          <div class='highlight'><pre><span class="hljs-keyword">enum</span> ResponseType {
+  RESPONSE_ERROR = <span class="hljs-number">1</span>; <span class="hljs-comment">// ErrorResponse</span>
+  RESPONSE_BOOLEAN = <span class="hljs-number">2</span>; <span class="hljs-comment">// BooleanResponse</span>
+  RESPONSE_INTEGER = <span class="hljs-number">3</span>; <span class="hljs-comment">// IntegerResponse</span>
+  RESPONSE_LONG = <span class="hljs-number">4</span>; <span class="hljs-comment">// LongResponse</span>
+  RESPONSE_HASHMAP = <span class="hljs-number">5</span>; <span class="hljs-comment">// HashmapResponse</span>
+  RESPONSE_RECORD = <span class="hljs-number">6</span>; <span class="hljs-comment">// RecordResponse</span>
+  RESPONSE_RECORD_LIST = <span class="hljs-number">7</span>; <span class="hljs-comment">// RecordListResponse</span>
+  RESPONSE_RECORD_STATUS = <span class="hljs-number">8</span>; <span class="hljs-comment">// RecordStatusResponse</span>
+  RESPONSE_CLUSTER = <span class="hljs-number">9</span>; <span class="hljs-comment">// ClusterResponse</span>
+  RESPONSE_CLUSTER_LIST = <span class="hljs-number">10</span>; <span class="hljs-comment">// ClusterListResponse</span>
+  RESPONSE_DB_INFO = <span class="hljs-number">11</span>; <span class="hljs-comment">// DbInfoResponse</span>
+  RESPONSE_DB_LIST = <span class="hljs-number">12</span>; <span class="hljs-comment">// DbListResponse</span>
+  RESPONSE_DATA_RANGE = <span class="hljs-number">13</span>; <span class="hljs-comment">// DataRangeResponse</span>
+}</pre></div>
+        
+      
+        
+        <h1 id="primitives">Primitives</h1>
+<p>These are the primitive data structures that are combined to form requests and responses.</p>
+
+        
+      
+        
+        <h2 id="record">Record</h2>
+<p>A record can be a document, a raw value or a list of bytes.</p>
+
+        
+          <div class='highlight'><pre>message Record {
+  optional int32 cluster = <span class="hljs-number">1</span>;
+  optional int64 position = <span class="hljs-number">2</span>;
+  required RecordType type = <span class="hljs-number">3</span>;
+  optional <span class="hljs-keyword">bool</span> prefetched = <span class="hljs-number">4</span>;
+  optional bytes content = <span class="hljs-number">5</span>; <span class="hljs-comment">// serialized record content.</span>
+}</pre></div>
+        
+      
+        
+        <h2 id="cluster">Cluster</h2>
+<p>Clusters are collections of records.</p>
+
+        
+          <div class='highlight'><pre>message Cluster {
+  required int32 id = <span class="hljs-number">1</span>;
+  required ClusterType type = <span class="hljs-number">2</span>;
+  required int32 dataSegment = <span class="hljs-number">3</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="query">Query</h2>
+<p>An SQL query to execute against the database.</p>
+
+        
+          <div class='highlight'><pre>message Query {
+  optional <span class="hljs-built_in">string</span> <span class="hljs-keyword">class</span> = <span class="hljs-number">1</span>;
+  required <span class="hljs-built_in">string</span> text = <span class="hljs-number">2</span>;
+  optional <span class="hljs-built_in">string</span> fetchPlan = <span class="hljs-number">3</span>;
+  optional int32 limit = <span class="hljs-number">4</span>;
+  optional bytes params = <span class="hljs-number">5</span>; <span class="hljs-comment">// serialized query parameters</span>
+}</pre></div>
+        
+      
+        
+        <h2 id="error">Error</h2>
+<p>Represents an error, which can optionally have a reference
+to a previous error.</p>
+
+        
+          <div class='highlight'><pre>message Error {
+  optional <span class="hljs-built_in">string</span> type = <span class="hljs-number">1</span>;
+  optional <span class="hljs-built_in">string</span> text = <span class="hljs-number">2</span>;
+  optional bytes stackTrace = <span class="hljs-number">3</span>;
+  optional Error prev = <span class="hljs-number">4</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="hash-map-item">Hash Map Item</h2>
+<p>Represents an item in a hash map.
+Since protobufs cannot express a map directly, this is a
+simple key / value pair.</p>
+
+        
+          <div class='highlight'><pre>message HashMapItem {
+  required <span class="hljs-built_in">string</span> key = <span class="hljs-number">1</span>;
+  required <span class="hljs-built_in">string</span> value = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h1 id="operations">Operations</h1>
+<p>Operations are requests that have some kind of parameters. They are sent immediately after a <a href="#request-header">RequestHeader</a>.</p>
+
+        
+      
+        
+        <h2 id="connect">Connect</h2>
+<p>Connect to the server, expects a simple ack in response.</p>
+
+        
+          <div class='highlight'><pre>message ConnectOperation {
+  optional <span class="hljs-built_in">string</span> driverName = <span class="hljs-number">1</span>; <span class="hljs-comment">// the name of the orientdb client</span>
+  optional <span class="hljs-built_in">string</span> driverVersion = <span class="hljs-number">2</span>; <span class="hljs-comment">// the client version</span>
+  required int32 protocolVersion = <span class="hljs-number">3</span>; <span class="hljs-comment">// the newest version of the protocol the client knows about</span>
+  optional <span class="hljs-built_in">string</span> clientId = <span class="hljs-number">4</span>; <span class="hljs-comment">// @fixme what does this do?</span>
+  required <span class="hljs-built_in">string</span> username = <span class="hljs-number">5</span>; <span class="hljs-comment">// the administrator username</span>
+  required <span class="hljs-built_in">string</span> password = <span class="hljs-number">6</span>; <span class="hljs-comment">// the administrator password</span>
+}</pre></div>
+        
+      
+        
+        <h2 id="open-database">Open Database</h2>
+<p>Open a database with the given name and credentials.
+Expects a <a href="#database-info-response">DbInfoResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message DbOpenOperation {
+  optional <span class="hljs-built_in">string</span> driverName = <span class="hljs-number">1</span>;
+  optional <span class="hljs-built_in">string</span> driverVersion = <span class="hljs-number">2</span>;
+  required int32 protocolVersion = <span class="hljs-number">3</span>;
+  optional <span class="hljs-built_in">string</span> clientId = <span class="hljs-number">4</span>;
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">5</span>;
+  required DatabaseType type = <span class="hljs-number">6</span>;
+  required <span class="hljs-built_in">string</span> username = <span class="hljs-number">7</span>;
+  required <span class="hljs-built_in">string</span> password = <span class="hljs-number">8</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="database-exists-">Database Exists?</h2>
+<p>Determine whether a database exists with the given name and storage type.
+Expects a <a href="#boolean-response">BooleanResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message DbExistsOperation {
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">1</span>;
+  required DatabaseStorageType storage = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="create-database">Create Database</h2>
+<p>Create a database with the given name and <a href="#database-storage-types">storage type</a>.
+Expects a simple ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message DbCreateOperation {
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">1</span>;
+  required DatabaseType type = <span class="hljs-number">2</span>;
+  required DatabaseStorageType storage = <span class="hljs-number">3</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="delete-database">Delete Database</h2>
+<p>Create a database with the given name and <a href="#database-storage-types">storage type</a>.
+Expects a simple ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message DbDeleteOperation {
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">1</span>;
+  required DatabaseStorageType storage = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="get-config">Get Config</h2>
+<p>Get the configuration value with the given key.
+Expects a <a href="#string-response">StringResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message ConfigGetOperation {
+  required <span class="hljs-built_in">string</span> key = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="set-config">Set Config</h2>
+<p>Set the configuration value with the given key.
+Expects a simple ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message ConfigSetOperation {
+  required <span class="hljs-built_in">string</span> key = <span class="hljs-number">1</span>;
+  required <span class="hljs-built_in">string</span> value = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="add-data-segment">Add Data Segment</h2>
+<p>Adds a data segment with the given name and location.
+Expects a <a href="#short-response">IntegerResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message DataSegmentAddOperation {
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">1</span>;
+  optional <span class="hljs-built_in">string</span> location = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="drop-data-segment">Drop Data Segment</h2>
+<p>Deletes the data segment with the given name.
+Expects an ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message DataSegmentDropOperation {
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="add-data-cluster">Add Data Cluster</h2>
+<p>Adds a data cluster with the given name / details.
+Expects an <a href="#integer-response">IntegerResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message ClusterAddOperation {
+  required ClusterType type = <span class="hljs-number">1</span>;
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">2</span>;
+  optional <span class="hljs-built_in">string</span> location = <span class="hljs-number">3</span>;
+  optional <span class="hljs-built_in">string</span> segment = <span class="hljs-number">4</span>;
+  optional int32 id = <span class="hljs-number">5</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="drop-data-cluster">Drop Data Cluster</h2>
+<p>Remove the data cluster with the given name.
+Expacts a simple ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message ClusterDropOperation {
+  required <span class="hljs-built_in">string</span> name = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="cluster-record-count">Cluster Record Count</h2>
+<p>Count the number of records in the given clusters.
+Expects a <a href="#long-response">LongResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message ClusterCountOperation {
+  repeated int32 ids = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="cluster-data-range">Cluster Data Range</h2>
+<p>Gets the data range for a cluster with the given ID.
+Expects a <a href="#data-range-response">DataRangeResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message ClusterDataRangeOperation {
+  required int32 id = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-load">Record Load</h2>
+<p>Load a record from the given cluster / position.
+Expects a <a href="#record-list-response">RecordListResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message RecordLoadOperation {
+  required int32 cluster = <span class="hljs-number">1</span>;
+  required int64 position = <span class="hljs-number">2</span>;
+  optional <span class="hljs-built_in">string</span> fetchPlan = <span class="hljs-number">3</span>;
+  optional <span class="hljs-keyword">bool</span> ignoreCache = <span class="hljs-number">4</span>;
+  optional <span class="hljs-keyword">bool</span> tombstones = <span class="hljs-number">5</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-create">Record Create</h2>
+<p>Create a record of the given type in the given cluster.
+Expects a <a href="#record-status-response">RecordStatusResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message RecordCreateOperation {
+  required int32 cluster = <span class="hljs-number">1</span>;
+  optional int32 dataSegment = <span class="hljs-number">2</span>;
+  required bytes content = <span class="hljs-number">3</span>;
+  required RecordType type = <span class="hljs-number">4</span>;
+  required CommandMode mode = <span class="hljs-number">5</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-update">Record Update</h2>
+<p>Update a record at the given position in the given cluster.
+Expects a <a href="#record-status-response">RecordStatusResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message RecordUpdateOperation {
+  required int32 cluster = <span class="hljs-number">1</span>;
+  required int64 position = <span class="hljs-number">2</span>;
+  required bytes content = <span class="hljs-number">3</span>;
+  optional int32 version = <span class="hljs-number">4</span>;
+  required RecordType type = <span class="hljs-number">5</span>;
+  required CommandMode mode = <span class="hljs-number">6</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-delete">Record Delete</h2>
+<p>Delete a record at the given position in the given cluster.
+Expects a simple ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message RecordDeleteOperation {
+  required int32 cluster = <span class="hljs-number">1</span>;
+  required int64 position = <span class="hljs-number">2</span>;
+  optional int32 version = <span class="hljs-number">3</span>;
+  required CommandMode mode = <span class="hljs-number">4</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-metadata">Record Metadata</h2>
+<p>Get the meta data for a record.
+Expects a <a href="#record-status-response">RecordStatusResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message RecordMetadataOperation {
+  required int32 cluster = <span class="hljs-number">1</span>;
+  required int64 position = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-clean-out">Record Clean Out</h2>
+<p>Clean out the given record.
+Expects a simple ‘ack’ response.</p>
+
+        
+          <div class='highlight'><pre>message RecordCleanoutOperation {
+  required int32 cluster = <span class="hljs-number">1</span>;
+  required int64 position = <span class="hljs-number">2</span>;
+  optional int32 version = <span class="hljs-number">3</span>;
+  required CommandMode mode = <span class="hljs-number">4</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="command">Command</h2>
+<p>Execute an SQL command against the database.
+Expects a <a href="#record-list-response">RecordListResponse</a>.</p>
+
+        
+          <div class='highlight'><pre>message CommandOperation {
+  required int32 sessionId = <span class="hljs-number">1</span>;
+  required CommandMode mode = <span class="hljs-number">2</span>;
+  required Query query = <span class="hljs-number">3</span>;
+}</pre></div>
+        
+      
+        
+        <h1 id="responses">Responses</h1>
+<p>These are the possible responses to the signals and operations defined above.</p>
+
+        
+      
+        
+        <h2 id="error-response">Error Response</h2>
+<p>A response indicating an error.</p>
+
+        
+          <div class='highlight'><pre>message ErrorResponse {
+  required Error error = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="boolean-response">Boolean Response</h2>
+<p>A response indicating a true / false value.</p>
+
+        
+          <div class='highlight'><pre>message BooleanResponse {
+  required <span class="hljs-keyword">bool</span> value = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="integer-response">Integer Response</h2>
+<p>A response representing a 32bit integer</p>
+
+        
+          <div class='highlight'><pre>message IntegerResponse {
+  required <span class="hljs-keyword">bool</span> value = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="long-response">Long Response</h2>
+<p> A response representing a 64bit integer.</p>
+
+        
+          <div class='highlight'><pre>message LongResponse {
+  required int64 value = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="hashmap-response">Hashmap Response</h2>
+<p>Represents a hash map of keys / values.</p>
+
+        
+          <div class='highlight'><pre>message HashmapResponse {
+  repeated HashMapItem items = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-response">Record Response</h2>
+<p>A response representing an individual record.</p>
+
+        
+          <div class='highlight'><pre>message RecordResponse {
+  required Record value = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-list-response">Record List Response</h2>
+<p>A response representing a list of records.</p>
+
+        
+          <div class='highlight'><pre>message RecordListResponse {
+  repeated Record values = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="cluster-response">Cluster Response</h2>
+<p>A response representing a single cluster.</p>
+
+        
+          <div class='highlight'><pre>message ClusterResponse {
+  required Cluster value = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="cluster-list-response">Cluster List Response</h2>
+<p>A response representing a list of clusters.</p>
+
+        
+          <div class='highlight'><pre>message ClusterListResponse {
+  repeated Cluster values = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="database-info-response">Database Info Response</h2>
+<p>Represents information about the state of a database.</p>
+
+        
+          <div class='highlight'><pre>message DbInfoResponse {
+  repeated Cluster clusters = <span class="hljs-number">1</span>;
+  optional bytes servers = <span class="hljs-number">2</span>; <span class="hljs-comment">// serialized servers list</span>
+  optional <span class="hljs-built_in">string</span> release = <span class="hljs-number">3</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="database-list-response">Database List Response</h2>
+<p>A serialized list of databases.</p>
+
+        
+          <div class='highlight'><pre>message DbListResponse {
+  optional bytes databases = <span class="hljs-number">1</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="data-range-response">Data Range Response</h2>
+<p>A response indicating a data range, with a begin and an end.</p>
+
+        
+          <div class='highlight'><pre>message DataRangeResponse {
+  required int64 begin = <span class="hljs-number">1</span>;
+  required int64 end = <span class="hljs-number">2</span>;
+}</pre></div>
+        
+      
+        
+        <h2 id="record-status-response">Record Status Response</h2>
+<p>A response indicating the status of an individual record.</p>
+
+        
+          <div class='highlight'><pre>message RecordStatusResponse {
+  optional int32 cluster = <span class="hljs-number">1</span>;
+  optional int64 position = <span class="hljs-number">2</span>;
+  optional int32 version = <span class="hljs-number">3</span>;
+}</pre></div>
+        
+      
+      <div class="fleur">h</div>
+    </div>
+  </div>
+</body>
+</html>
