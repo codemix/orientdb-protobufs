@@ -425,9 +425,8 @@ message RecordCleanoutOperation {
 // Execute an SQL command against the database.
 // Expects a [RecordListResponse](#record-list-response).
 message CommandOperation {
-  required int32 sessionId = 1;
-  required CommandMode mode = 2;
-  required Query query = 3;
+  required CommandMode mode = 1;
+  required Query query = 2;
 }
 
 
