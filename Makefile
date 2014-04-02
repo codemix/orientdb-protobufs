@@ -10,7 +10,7 @@ docs: orientdb.proto
 	@mv ./docs/orientdb.html ./docs/index.html
 
 
-release: orientdb.proto docs
+release: docs
 	@git checkout gh-pages
 	@git rm ./index.html
 	@git rm ./docco.css

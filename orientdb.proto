@@ -1,5 +1,7 @@
 // # Protocol Buffers for OrientDB
 //
+// > **version 0.0.0**
+//
 // The protobuf based communication protocol is relatively simple, the client sends a request to the server and the server sends a
 // response, in FIFO order. There are two different types of request a client can send:
 //
