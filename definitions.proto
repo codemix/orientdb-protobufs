@@ -1,53 +1,181 @@
+// # Protocol Buffers for OrientDB
+//
+// The protobuf based communication protocol is relatively simple, the client sends a request to the server and the server sends a
+// response, in FIFO order. There are two different types of request a client can send:
+//
+//  1 **Signals** - individual messages that have no content other than an optional session id and their [RequestType](#request-types).
+//    Signals are expressed entirely within a [RequestHeader](#request-header), they have no further content. An example of a signal would be the db reload command,
+//    which operates solely on the currently selected database and accepts no parameters.
+//
+//  2 **Operations** - Operations are requests that require some kind of parameters, such as a database name and credentials for [db open](#open-database).
+//    Operations are expressed as a [RequestHeader](#request-header) immediately followed by the [operation message](#operations).
+//
+// In response, the server sends a [ResponseHeader](#response-header). This response header contains the session id where appropriate, and optionally, the [response type](#response-type).
+// The response type indicates the type of the next message so that the client knows how to decode it. If a response type is omitted, the response is treated as an 'ack', and no response body will be sent.
+//
+// The request / response algorithm looks like this:
+//
+//    1. Client sends a [RequestHeader](#request-header) message containing the request type, and optionally, a session id.
+//    2. If the request is an operation and not a signal, immediately send the operation message of the applicable type.
+//    3. Server responds with a [ResponseHeader](#response-header). If the response header omits a response type, the response is
+//    treated as an 'ack' and is considered complete.
+//    4. If a response type *is* specified, the server will immediately send a response message of the type indicated in the header.
+//    If the client does not know how to handle the received message type, it can skip it.
+//
+//
+// The definitions are split into 5 logical groups:
+//
+// 1. [Headers](#headers) - The request / response headers.
+// 2. [Enums](#enums) - Constant values reused by the rest of the protocol.
+// 3. [Primitives](#primitives) - The primitive data structures that make up the protocol.
+// 4. [Operations](#operations) - The operations can be sent to the server.
+// 5. [Responses](#responses) - The responses that can be received by the client.
+
+
+// # Headers
+// Headers are sent by both client and server, they contain information about the request / response type and indicate
+// what kind of message, if any, the other side should expect to recieve next.
+
+
+// ## Request Header
+// This is the header that precedes a request.
+// It is used to indicate the [type](#request-types) of the following request message if any.
+message RequestHeader {
+  optional int32 sessionId = 1;
+  required RequestType type = 2;
+}
+
+
+// ## Response Header
+// This is the header that precedes a response, it indicates whether or not the
+// client should expect a response body and if so, what [type](#response-types) that response will be.
+// If the response type is omited, the response is treated as an 'ack' and no response body will be expected.
+message ResponseHeader {
+  optional int32 sessionId = 1;
+  optional ResponseType type = 2;
+}
+
+
+
 // # Enums
+// These constant values are used by other data structures in the protocol.
 
 
-/**
- * # Database Storage Types
- */
+// ## Database Storage Types
 enum DatabaseStorageType {
   LOCAL = 0;
   MEMORY = 1;
   PLOCAL = 2;
 }
-/**
- * # Database Types
- */
+
+// ## Database Types
 enum DatabaseType {
   DOCUMENT = 0;
   GRAPH = 1;
 }
 
-/**
- * # Record Types
- */
+
+// ## Record Types
 enum RecordType {
   RECORD_BYTES = 0;
   RECORD_FLAT_DATA = 1;
   RECORD_DOCUMENT = 2;
 }
 
-/**
- * # Cluster Types
- */
+
+// ## Cluster Types
 enum ClusterType {
   CLUSTER_LOCAL = 0;
   CLUSTER_MEMORY = 1;
   CLUSTER_PHYSICAL = 2;
 }
 
-/**
- * # Command Modes
- */
+
+// ## Command Modes
 enum CommandMode {
   SYNC = 0;
   ASYNC = 1;
 }
 
-// # Primitives
 
-/**
- * # Record
- */
+// ## Request Types
+enum RequestType {
+  REQUEST_SHUTDOWN = 1; // Shut down server.
+  REQUEST_CONNECT = 2; // Required initial operation to access to server commands.
+  REQUEST_DB_OPEN = 3; // Required initial operation to access to the database.
+  REQUEST_DB_CREATE = 4; // Add a new database.
+  REQUEST_DB_EXIST = 6; // Check if database exists.
+  REQUEST_DB_DROP = 7; // Delete database.
+  REQUEST_CONFIG_GET = 70; //  Get a configuration property.
+  REQUEST_CONFIG_SET = 71; //  Set a configuration property.
+  REQUEST_CONFIG_LIST = 72; //  Get a list of configuration properties.
+  REQUEST_DB_LIST = 74; // Get a list of databases.
+  REQUEST_DB_CLOSE = 5; // Close a database.
+  REQUEST_DB_SIZE = 8; // Get the size of a database (in bytes).
+  REQUEST_DB_COUNTRECORDS = 9; // Get total number of records in a database.
+  REQUEST_DATACLUSTER_ADD = 10; //  Add a data cluster.
+  REQUEST_DATACLUSTER_DROP = 11; //  Delete a data cluster.
+  REQUEST_DATACLUSTER_COUNT = 12; //  Get the total number of data clusters.
+  REQUEST_DATACLUSTER_DATARANGE = 13; //  Get the data range of data clusters.
+  REQUEST_DATACLUSTER_COPY = 14; //  Copy a data cluster.
+  REQUEST_DATACLUSTER_LH_CLUSTER_IS_USED = 16; // ?
+  REQUEST_DATASEGMENT_ADD = 20; //  Add a data segment.
+  REQUEST_DATASEGMENT_DROP = 21; //  Delete a data segment.
+  REQUEST_RECORD_METADATA = 29; //  Get metadata from a record.
+  REQUEST_RECORD_LOAD = 30; //  Load a record.
+  REQUEST_RECORD_CREATE = 31; //  Add a record.
+  REQUEST_RECORD_UPDATE = 32;
+  REQUEST_RECORD_DELETE = 33; //  Delete a record.
+  REQUEST_RECORD_COPY = 34; //  Copy a record.
+  REQUEST_POSITIONS_HIGHER = 36; //  Get a record above the current record.
+  REQUEST_POSITIONS_LOWER = 37; //  Get the record below the current record.
+  REQUEST_RECORD_CLEAN_OUT = 38; //  Clean out record.
+  REQUEST_POSITIONS_FLOOR = 39; //  Get the last record.
+  REQUEST_COUNT = 40; // (DEPRECATED)  See REQUEST_DATACLUSTER_COUNT
+  REQUEST_COMMAND = 41; //  Execute a command.
+  REQUEST_POSITIONS_CEILING = 42; //  Get the first record.
+  REQUEST_TX_COMMIT = 60; //  Commit transaction.
+  REQUEST_DB_RELOAD = 73; //  Reload database.
+  REQUEST_PUSH_RECORD = 79;
+  REQUEST_PUSH_DISTRIB_CONFIG = 80;
+  REQUEST_DB_COPY = 90;
+  REQUEST_REPLICATION = 91;
+  REQUEST_CLUSTER = 92;
+  REQUEST_DB_TRANSFER = 93;
+  REQUEST_DB_FREEZE = 94;
+  REQUEST_DB_RELEASE = 95;
+  REQUEST_DATACLUSTER_FREEZE = 96;
+  REQUEST_DATACLUSTER_RELEASE = 97;
+  REQUEST_CREATE_SBTREE_BONSAI = 110; // Creates an sb-tree bonsai on the remote server
+  REQUEST_SBTREE_BONSAI_GET = 111; // Get value by key from sb-tree bonsai
+  REQUEST_SBTREE_BONSAI_FIRST_KEY = 112; // Get first key from sb-tree bonsai
+  REQUEST_SBTREE_BONSAI_GET_ENTRIES_MAJOR = 113; // Gets the portion of entries major than specified one. If returns 0 entries than the specified entrie is the largest
+  REQUEST_RIDBAG_GET_SIZE = 114; // Rid-bag specific operation. Send but doesRetrieves computed size of rid bag.
+}
+
+
+// ## Response Types
+enum ResponseType {
+  RESPONSE_ERROR = 1; // ErrorResponse
+  RESPONSE_BOOLEAN = 2; // BooleanResponse
+  RESPONSE_INTEGER = 3; // IntegerResponse
+  RESPONSE_LONG = 4; // LongResponse
+  RESPONSE_HASHMAP = 5; // HashmapResponse
+  RESPONSE_RECORD = 6; // RecordResponse
+  RESPONSE_RECORD_LIST = 7; // RecordListResponse
+  RESPONSE_RECORD_STATUS = 8; // RecordStatusResponse
+  RESPONSE_CLUSTER = 9; // ClusterResponse
+  RESPONSE_CLUSTER_LIST = 10; // ClusterListResponse
+  RESPONSE_DB_INFO = 11; // DbInfoResponse
+  RESPONSE_DB_LIST = 12; // DbListResponse
+  RESPONSE_DATA_RANGE = 13; // DataRangeResponse
+}
+
+// # Primitives
+// These are the primitive data structures that are combined to form requests and responses.
+
+// ## Record
+// A record can be a document, a raw value or a list of bytes.
 message Record {
   optional int32 cluster = 1;
   optional int64 position = 2;
@@ -56,18 +184,18 @@ message Record {
   optional bytes content = 5; // serialized record content.
 }
 
-/**
- * # Cluster
- */
+
+// ## Cluster
+// Clusters are collections of records.
 message Cluster {
   required int32 id = 1;
   required ClusterType type = 2;
   required int32 dataSegment = 3;
 }
 
-/**
- * # Query
- */
+
+// ## Query
+// An SQL query to execute against the database.
 message Query {
   optional string class = 1;
   required string text = 2;
@@ -76,11 +204,10 @@ message Query {
   optional bytes params = 5; // serialized query parameters
 }
 
-/**
- * # Error
- * Represents an error, which can optionally have a reference
- * to a previous error.
- */
+
+// ## Error
+// Represents an error, which can optionally have a reference
+// to a previous error.
 message Error {
   optional string type = 1;
   optional string text = 2;
@@ -88,12 +215,11 @@ message Error {
   optional Error prev = 4;
 }
 
-/**
- * # Hash Map Item
- * Represents an item in a hash map.
- * Since protobufs cannot express a map directly, this is a
- * simple key / value pair.
- */
+
+// ## Hash Map Item
+// Represents an item in a hash map.
+// Since protobufs cannot express a map directly, this is a
+// simple key / value pair.
 message HashMapItem {
   required string key = 1;
   required string value = 2;
@@ -101,370 +227,292 @@ message HashMapItem {
 
 
 // # Operations
+// Operations are requests that have some kind of parameters. They are sent immediately after a [RequestHeader](#request-header).
 
-/**
- * # Connect
- * Connect to the server.
- * @see OkResponse
- */
-message ConnectOp {
-  optional int32 sessionId = 1;
-  optional string driverName = 2;
-  optional string driverVersion = 3;
-  required int32 protocolVersion = 4;
-  optional string clientId = 5;
-  required string username = 6;
-  required string password = 7;
+// ## Connect
+// Connect to the server, expects a simple ack in response.
+message ConnectOperation {
+  optional string driverName = 1; // the name of the orientdb client
+  optional string driverVersion = 2; // the client version
+  required int32 protocolVersion = 3; // the newest version of the protocol the client knows about
+  optional string clientId = 4; // @fixme what does this do?
+  required string username = 5; // the administrator username
+  required string password = 6; // the administrator password
 }
 
-/**
- * # Open Database
- */
-message DbOpenOp {
-  optional int32 sessionId = 1;
-  optional string driverName = 2;
-  optional string driverVersion = 3;
-  required int32 protocolVersion = 4;
-  optional string clientId = 5;
-  required string name = 6;
-  required DatabaseType type = 7;
-  required string username = 8;
-  required string password = 9;
+
+// ## Open Database
+// Open a database with the given name and credentials.
+// Expects a [DbInfoResponse](#database-info-response).
+message DbOpenOperation {
+  optional string driverName = 1;
+  optional string driverVersion = 2;
+  required int32 protocolVersion = 3;
+  optional string clientId = 4;
+  required string name = 5;
+  required DatabaseType type = 6;
+  required string username = 7;
+  required string password = 8;
 }
 
-message DbOpenResponse {
-  required int32 sessionId = 1;
-  repeated Cluster clusters = 2;
-  optional bytes servers = 3; // serialized servers list
-  optional string release = 4;
+
+// ## Database Exists?
+// Determine whether a database exists with the given name and storage type.
+// Expects a [BooleanResponse](#boolean-response).
+message DbExistsOperation {
+  required string name = 1;
+  required DatabaseStorageType storage = 2;
 }
 
-/**
- * # List Databases
- */
-message DbListOp {
-  optional int32 sessionId = 1;
-}
 
-message DbListResponse {
-  optional bytes databases = 1; // serialized database list
-}
-
-/**
- * # Reload Database
- */
-message DbReloadOp {
-  required int32 sessionId = 1;
-}
-
-message DbReloadResponse {
-  required int32 sessionId = 1;
-  repeated Cluster clusters = 2;
-}
-
-/**
- * # Database Exists?
- */
-message DbExistsOp {
-  required int32 sessionId = 1;
-  required string name = 2;
+// ## Create Database
+// Create a database with the given name and [storage type](#database-storage-types).
+// Expects a simple 'ack' response.
+message DbCreateOperation {
+  required string name = 1;
+  required DatabaseType type = 2;
   required DatabaseStorageType storage = 3;
 }
 
-message DbExistsResponse {
-  required int32 sessionId = 1;
-  required bool exists = 2;
+
+// ## Delete Database
+// Create a database with the given name and [storage type](#database-storage-types).
+// Expects a simple 'ack' response.
+message DbDeleteOperation {
+  required string name = 1;
+  required DatabaseStorageType storage = 2;
 }
 
-/**
- * # Create Database
- * @see OkResponse
- */
-message DbCreateOp {
-  required int32 sessionId = 1;
-  required string name = 2;
-  required DatabaseType type = 3;
-  required DatabaseStorageType storage = 4;
+
+// ## Get Config
+// Get the configuration value with the given key.
+// Expects a [StringResponse](#string-response).
+message ConfigGetOperation {
+  required string key = 1;
 }
 
-/**
- * # Count Database Records
- */
-message DbCountRecordsOp {
-  required int32 sessionId = 1;
-}
-
-message DbCountRecordsResponse {
-  required int32 sessionId = 1;
-  required int64 count = 2;
-}
-
-/**
- * # Delete Database
- * @see OkResponse
- */
-message DbDeleteOp {
-  required int32 sessionId = 1;
-  required string name = 2;
-  required DatabaseStorageType storage = 3;
-}
-
-/**
- * # Close Database
- * @see OkResponse
- */
-message DbCloseOp {
-  required int32 sessionId = 1;
-}
-
-/**
- * # Get Config
- */
-message ConfigGetOp {
-  optional int32 sessionId = 1;
-  required string key = 2;
-}
-
-message ConfigGetResponse {
-  optional int32 sessionId = 1;
+// ## Set Config
+// Set the configuration value with the given key.
+// Expects a simple 'ack' response.
+message ConfigSetOperation {
+  required string key = 1;
   required string value = 2;
 }
 
-/**
- * # Set Config
- * @see OkResponse
- */
-message ConfigSetOp {
-  optional int32 sessionId = 1;
-  required string key = 2;
-  required string value = 3;
-}
-
-/**
- * # List Config
- */
-message ConfigListOp {
-  optional int32 sessionId = 1;
-}
-
-message ConfigListResponse {
-  optional int32 sessionId = 1;
-  repeated HashMapItem items = 2;
+// ## Add Data Segment
+// Adds a data segment with the given name and location.
+// Expects a [IntegerResponse](#short-response).
+message DataSegmentAddOperation {
+  required string name = 1;
+  optional string location = 2;
 }
 
 
-/**
- * # Add Data Segment
- */
-message DataSegmentAddOp {
-  required int32 sessionId = 1;
-  required string name = 3;
-  optional string location = 4;
+
+// ## Drop Data Segment
+// Deletes the data segment with the given name.
+// Expects an 'ack' response.
+message DataSegmentDropOperation {
+  required string name = 1;
 }
 
-message DataSegmentAddResponse {
-  required int32 sessionId = 1;
-  required int32 id = 2;
-}
 
-/**
- * # Drop Data Segment
- * @see OperationResponse
- */
-message DataSegmentDropOp {
-  required int32 sessionId = 1;
+// ## Add Data Cluster
+// Adds a data cluster with the given name / details.
+// Expects an [IntegerResponse](#integer-response).
+message ClusterAddOperation {
+  required ClusterType type = 1;
   required string name = 2;
+  optional string location = 3;
+  optional string segment = 4;
+  optional int32 id = 5;
 }
 
-/**
- * # Add Data Cluster
- */
-message ClusterAddOp {
-  required int32 sessionId = 1;
-  required ClusterType type = 2;
-  required string name = 3;
-  optional string location = 4;
-  optional string segment = 5;
-  optional int32 id = 6;
+
+// ## Drop Data Cluster
+// Remove the data cluster with the given name.
+// Expacts a simple 'ack' response.
+message ClusterDropOperation {
+  required string name = 1;
 }
 
-message ClusterAddResponse {
-  required int32 sessionId = 1;
-  required int32 id = 2;
+
+// ## Cluster Record Count
+// Count the number of records in the given clusters.
+// Expects a [LongResponse](#long-response).
+message ClusterCountOperation {
+  repeated int32 ids = 1;
 }
 
-/**
- * # Drop Data Cluster
- * @see OperationResponse
- */
-message ClusterDropOp {
-  required int32 sessionId = 1;
-  required string name = 2;
+
+// ## Cluster Data Range
+// Gets the data range for a cluster with the given ID.
+// Expects a [DataRangeResponse](#data-range-response).
+message ClusterDataRangeOperation {
+  required int32 id = 1;
 }
 
-/**
- * # Cluster Record Count
- */
-message ClusterCountOp {
-  required int32 sessionId = 1;
-  repeated int32 ids = 2;
+// ## Record Load
+// Load a record from the given cluster / position.
+// Expects a [RecordListResponse](#record-list-response).
+message RecordLoadOperation {
+  required int32 cluster = 1;
+  required int64 position = 2;
+  optional string fetchPlan = 3;
+  optional bool ignoreCache = 4;
+  optional bool tombstones = 5;
 }
 
-message ClusterCountResponse {
-  required int32 sessionId = 1;
-  required int64 count = 2;
+
+
+// ## Record Create
+// Create a record of the given type in the given cluster.
+// Expects a [RecordStatusResponse](#record-status-response).
+message RecordCreateOperation {
+  required int32 cluster = 1;
+  optional int32 dataSegment = 2;
+  required bytes content = 3;
+  required RecordType type = 4;
+  required CommandMode mode = 5;
 }
 
-/**
- * # Cluster Data Range
- */
-message ClusterDataRangeOp {
-  required int32 sessionId = 1;
-  required int32 id = 2;
-}
 
-message ClusterDataRangeResponse {
-  required int32 sessionId = 1;
-  required int64 begin = 2;
-  required int64 end = 3;
-}
-
-/**
- * # Record Load
- */
-message RecordLoadOp {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  required int64 position = 3;
-  optional string fetchPlan = 4;
-  optional bool ignoreCache = 5;
-  optional bool tombstones = 6;
-}
-
-message RecordLoadResponse {
-  required int32 sessionId = 1;
-  repeated Record records = 2;
-}
-
-/**
- * # Record Create
- */
-message RecordCreateOp {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  optional int32 dataSegment = 3;
-  required bytes content = 4;
+// ## Record Update
+// Update a record at the given position in the given cluster.
+// Expects a [RecordStatusResponse](#record-status-response).
+message RecordUpdateOperation {
+  required int32 cluster = 1;
+  required int64 position = 2;
+  required bytes content = 3;
+  optional int32 version = 4;
   required RecordType type = 5;
   required CommandMode mode = 6;
 }
 
-message RecordCreateResponse {
-  required int32 sessionId = 1;
+
+// ## Record Delete
+// Delete a record at the given position in the given cluster.
+// Expects a simple 'ack' response.
+message RecordDeleteOperation {
+  required int32 cluster = 1;
   required int64 position = 2;
-  required int32 version = 3;
+  optional int32 version = 3;
+  required CommandMode mode = 4;
 }
 
-/**
- * # Record Update
- */
-message RecordUpdateOp {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  required int64 position = 3;
-  required bytes content = 4;
-  optional int32 version = 5;
-  required RecordType type = 6;
-  required CommandMode mode = 7;
+
+// ## Record Metadata
+// Get the meta data for a record.
+// Expects a [RecordStatusResponse](#record-status-response).
+message RecordMetadataOperation {
+  required int32 cluster = 1;
+  required int64 position = 2;
 }
 
-message RecordUpdateResponse {
-  required int32 sessionId = 1;
-  required int32 version = 2;
+
+// ## Record Clean Out
+// Clean out the given record.
+// Expects a simple 'ack' response.
+message RecordCleanoutOperation {
+  required int32 cluster = 1;
+  required int64 position = 2;
+  optional int32 version = 3;
+  required CommandMode mode = 4;
 }
 
-/**
- * # Record Delete
- * @see OperationResponse
- */
-message RecordDeleteOp {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  required int64 position = 3;
-  optional int32 version = 4;
-  required CommandMode mode = 5;
-}
 
-/**
- * # Record Metadata
- */
-message RecordMetadataOp {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  required int64 position = 3;
-}
-
-message RecordMetadataResponse {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  required int64 position = 3;
-  required int32 version = 4;
-}
-
-/**
- * # Record Clean Out
- * @see OperationResponse
- */
-message RecordCleanoutOp {
-  required int32 sessionId = 1;
-  required int32 cluster = 2;
-  required int64 position = 3;
-  optional int32 version = 4;
-  required CommandMode mode = 5;
-}
-
-/**
- * # Command
- * @see CommandResponse
- */
-message CommandOp {
+// ## Command
+// Execute an SQL command against the database.
+// Expects a [RecordListResponse](#record-list-response).
+message CommandOperation {
   required int32 sessionId = 1;
   required CommandMode mode = 2;
   required Query query = 3;
 }
 
-message CommandResponse {
-  required int32 sessionId = 1;
-  repeated Record records = 2;
-}
-
 
 // # Responses
+// These are the possible responses to the signals and operations defined above.
 
-
-/**
- * # OK Response
- * A generic response meaning that the request was successful.
- */
-message OkResponse {
-  optional int32 sessionId = 1;
-}
-
-/**
- * # Error Response
- * A response indicating an error.
- */
+// ## Error Response
+// A response indicating an error.
 message ErrorResponse {
-  optional int32 sessionId = 1;
-  required Error error = 2;
+  required Error error = 1;
 }
 
+// ## Boolean Response
+// A response indicating a true / false value.
+message BooleanResponse {
+  required bool value = 1;
+}
 
-/**
- * # Operation Response
- * A response indicating whether an operation was successful.
- */
-message OperationResponse {
-  required int32 sessionId = 1;
-  optional int32 version = 2;
-  required bool success = 3;
+// ## Integer Response
+// A response representing a 32bit integer
+message IntegerResponse {
+  required bool value = 1;
+}
+
+// ## Long Response
+//  A response representing a 64bit integer.
+message LongResponse {
+  required int64 value = 1;
+}
+
+// ## Hashmap Response
+// Represents a hash map of keys / values.
+message HashmapResponse {
+  repeated HashMapItem items = 1;
+}
+
+// ## Record Response
+// A response representing an individual record.
+message RecordResponse {
+  required Record value = 1;
+}
+
+// ## Record List Response
+// A response representing a list of records.
+message RecordListResponse {
+  repeated Record values = 1;
+}
+
+// ## Cluster Response
+// A response representing a single cluster.
+message ClusterResponse {
+  required Cluster value = 1;
+}
+
+// ## Cluster List Response
+// A response representing a list of clusters.
+message ClusterListResponse {
+  repeated Cluster values = 1;
+}
+
+// ## Database Info Response
+// Represents information about the state of a database.
+message DbInfoResponse {
+  repeated Cluster clusters = 1;
+  optional bytes servers = 2; // serialized servers list
+  optional string release = 3;
+}
+
+// ## Database List Response
+// A serialized list of databases.
+message DbListResponse {
+  optional bytes databases = 1;
+}
+
+// ## Data Range Response
+// A response indicating a data range, with a begin and an end.
+message DataRangeResponse {
+  required int64 begin = 1;
+  required int64 end = 2;
+}
+
+// ## Record Status Response
+// A response indicating the status of an individual record.
+message RecordStatusResponse {
+  optional int32 cluster = 1;
+  optional int64 position = 2;
+  optional int32 version = 3;
 }
