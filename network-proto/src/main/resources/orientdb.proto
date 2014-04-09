@@ -199,7 +199,7 @@ message Cluster {
 // ## Query
 // An SQL query to execute against the database.
 message Query {
-  optional string class = 1;
+  optional string oclass = 1;
   required string text = 2;
   optional string fetchPlan = 3;
   optional int32 limit = 4;

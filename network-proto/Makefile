@@ -2,7 +2,7 @@ all: orientdb.proto
 	@mkdir -p ./out/cpp
 	@mkdir -p ./out/java
 	@mkdir -p ./out/python
-	@protoc --java_out=./out/java --cpp_out=./out/cpp --python_out=./out/python ./orientdb.proto
+	@protoc --java_out=./target/java --cpp_out=./target/cpp --python_out=./target/python ./src/main/resources/orientdb.proto
 
 docs: orientdb.proto
 	@npm install
